@@ -2,9 +2,16 @@ import sys
 import socket
 from bs4 import BeautifulSoup
 import re
+import json
+
+with open('data.json','r') as json_file:
+    cache = json.load(json_file)
 
 # Function to make an HTTP request to a URL
 def make_http_request(url):
+    if url in cache:
+        return cache[url]
+    
     try:
         # Parse URL to extract host and path
         host, path = parse_url(url)
@@ -32,13 +39,24 @@ def make_http_request(url):
                 break
             response += data
         
+        # Decode the response bytes using ISO-8859-1 (latin-1) encoding
+        try:
+            decoded_response = response.decode('utf-8')
+        except UnicodeDecodeError:
+            decoded_response = response.decode('ISO-8859-1')  # Fallback to latin-1
+        
         # Close the connection
         client.close()
 
-        return response
+        cache[url] = decoded_response
+
+        with open("data.json", "w") as outfile:
+           json.dump(cache, outfile)
+
+        return decoded_response
     
     except Exception as e:
-         # Connection unsuccessful message
+        # Connection unsuccessful message
         print("Connection with the site was unsuccessful.")
         print(f"Error: {str(e)}")
 
@@ -46,15 +64,9 @@ def make_http_request(url):
 def connect_to_site(url):
 
     response = make_http_request(url)
-
-    # Decode the response bytes using ISO-8859-1 (latin-1) encoding
-    try:
-        decoded_response = response.decode('utf-8')
-    except UnicodeDecodeError:
-        decoded_response = response.decode('ISO-8859-1')  # Fallback to latin-1
         
     # Parse the HTML content using BeautifulSoup
-    soup = BeautifulSoup(decoded_response, 'html.parser')
+    soup = BeautifulSoup(response, 'html.parser')
         
     # Extract website name
     website_name = soup.title.string.strip() if soup.title else host
@@ -82,6 +94,10 @@ def parse_url(url):
     host = parts[2]
     path = "/" + parts[3] if len(parts) == 4 else "/"
 
+    print(parts)
+    print(host)
+    print(f"path:{path}")
+
     return host, path
 
 # Function to make a search request to a search engine
@@ -91,15 +107,9 @@ def search(search_term):
     googleClass = "DnJfK"
 
     response = make_http_request(url)
-
-    # Decode the response bytes using ISO-8859-1 (latin-1) encoding
-    try:
-        decoded_response = response.decode('utf-8')
-    except UnicodeDecodeError:
-        decoded_response = response.decode('ISO-8859-1')  # Fallback to latin-1
         
     # Parse the HTML content using BeautifulSoup
-    soup = BeautifulSoup(decoded_response, 'html.parser')
+    soup = BeautifulSoup(response, 'html.parser')
 
     # Find the search result links
     for item in soup.find_all("div", class_=googleClass):
